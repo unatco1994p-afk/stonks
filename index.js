@@ -20,7 +20,7 @@ const db = new Firestore({
     client_email: credentials.client_email,
     private_key: credentials.private_key,
   },
-  databaseId: 'stonks-db'
+  databaseId: process.env.FIRESTORE_DB
 });
 
 const PORT = process.env.PORT || 8080;

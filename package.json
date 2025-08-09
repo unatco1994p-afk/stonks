@@ -3,6 +3,7 @@
     "version": "1.0.0",
     "description": "Simple Hello World Node.js App",
     "main": "index.js",
+    "type": "module",
     "scripts": {
         "start": "node index.js"
     },

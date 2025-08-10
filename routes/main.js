@@ -1,5 +1,6 @@
 import express from 'express';
 import logsRouter from './logs.js';
+import authRouter from './auth.js';
 
 const router = express.Router();
 
@@ -11,5 +12,6 @@ router.get('/', (req, res) => {
 });
 
 router.use('/logs', logsRouter);
+router.use('/auth', authRouter);
 
 export default router;

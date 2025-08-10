@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import routes from './routes/main.js';
+import { verifyToken } from './config/auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;

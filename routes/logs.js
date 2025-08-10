@@ -1,10 +1,11 @@
 import express from 'express';
 import db from '../config/db.js';
+import { verifyToken } from '../config/auth.js';
 
 const router = express.Router();
 
 // POST /log
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const data = {
       createdAt: new Date(),
@@ -24,7 +25,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /logs
-router.get('/', async (req, res) => {
+router.get('/', verifyToken, async (req, res) => {
   try {
     const snapshot = await db.collection("testMessages")
       .orderBy("createdAt", "desc")

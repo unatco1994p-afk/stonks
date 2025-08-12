@@ -7,9 +7,31 @@ const router = express.Router();
 // POST /log
 router.post('/', verifyToken, async (req, res) => {
   try {
+    // Pobieranie IP klienta (uwzględnia proxy)
+    const ip =
+      req.headers['x-forwarded-for']?.split(',')[0] ||
+      req.connection?.remoteAddress ||
+      req.socket?.remoteAddress ||
+      req.ip;
+
+    // Dane o przeglądarce / urządzeniu z nagłówka User-Agent
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    // Czas serwera
+    const timestamp = new Date();
+
+    // Host, metoda, oryginalny URL
+    const host = req.headers.host;
+    const method = req.method;
+    const path = req.originalUrl;
+
     const data = {
-      createdAt: new Date(),
-      ...(req.body || {})
+      ip,
+      userAgent,
+      method,
+      host,
+      path,
+      createdAt: timestamp
     };
 
     const ref = await db.collection("testMessages").add(data);

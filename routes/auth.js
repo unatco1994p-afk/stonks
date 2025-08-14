@@ -58,6 +58,7 @@ router.post('/register',
       const userRef = await db.collection(USERS_COLLECTION).add({
         email,
         password: hashedPassword,
+        roles: ['guest'],
         createdAt: new Date()
       });
 
@@ -110,7 +111,7 @@ router.post('/login',
         return res.status(401).json({ error: 'Invalid login data' });
       }
 
-      const token = generateToken({ uid: userDoc.id, email: userData.email });
+      const token = generateToken({ uid: userDoc.id, email: userData.email, roles: userData.roles });
 
       res.json({ success: true, token });
     } catch (err) {

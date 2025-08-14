@@ -25,13 +25,16 @@ router.post('/', verifyToken, async (req, res) => {
     const method = req.method;
     const path = req.originalUrl;
 
+    const content = req.body?.content;
+
     const data = {
       ip,
       userAgent,
       method,
       host,
       path,
-      createdAt: timestamp
+      content,
+      createdAt: timestamp,
     };
 
     const ref = await db.collection("testMessages").add(data);

@@ -1,13 +1,12 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import db from '../config/db.js';
+import USERS_COLLECTON from '../config/db.js';
 import { generateToken, verifyToken } from '../config/auth.js';
 import { body, validationResult } from 'express-validator';
 import xss from 'xss';
 import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
-const USERS_COLLECTION = 'users';
 
 const loginLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
@@ -15,7 +14,6 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts. Try again later.' }
 });
 
-// Rejestracja
 router.post('/register',
   [
     // Walidacja i sanityzacja pola email
@@ -44,8 +42,7 @@ router.post('/register',
     }
 
     try {
-      // Sprawdź czy użytkownik już istnieje
-      const existing = await db.collection(USERS_COLLECTION)
+      const existing = await USERS_COLLECTON
         .where('email', '==', email)
         .get();
 
@@ -55,7 +52,7 @@ router.post('/register',
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const userRef = await db.collection(USERS_COLLECTION).add({
+      const userRef = await USERS_COLLECTON.add({
         email,
         password: hashedPassword,
         roles: ['guest'],
@@ -69,7 +66,6 @@ router.post('/register',
     }
   });
 
-// Logowanie
 router.post('/login',
   loginLimiter,
   [
@@ -94,7 +90,7 @@ router.post('/login',
     }
 
     try {
-      const snapshot = await db.collection(USERS_COLLECTION)
+      const snapshot = await USERS_COLLECTON
         .where('email', '==', email)
         .limit(1)
         .get();
@@ -120,7 +116,7 @@ router.post('/login',
     }
   });
 
-// Test – dane użytkownika (wymaga tokenu)
+// TODO: add returning of all user specific data
 router.get('/me', verifyToken, (req, res) => {
   res.json({ success: true, user: req.user });
 });

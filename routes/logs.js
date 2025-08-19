@@ -1,5 +1,5 @@
 import express from 'express';
-import LOGS_COLLECTION from '../config/db.js';
+import { LOGS_COLLECTION } from '../config/db.js';
 import { verifyToken } from '../config/auth.js';
 
 const router = express.Router();

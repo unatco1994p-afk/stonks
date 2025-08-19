@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import USERS_COLLECTION from '../config/db.js';
+import { USERS_COLLECTION } from './db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'jwtsecretkey';
 

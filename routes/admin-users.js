@@ -1,4 +1,4 @@
-import USERS_COLLECTION from '../config/db.js';
+import { USERS_COLLECTION } from '../config/db.js';
 import { verifyRole, verifyToken } from '../config/auth.js';
 import express from 'express';
 

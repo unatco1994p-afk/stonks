@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import USERS_COLLECTON from '../config/db.js';
+import { USERS_COLLECTION } from '../config/db.js';
 import { generateToken, verifyToken } from '../config/auth.js';
 import { body, validationResult } from 'express-validator';
 import xss from 'xss';
@@ -42,7 +42,7 @@ router.post('/register',
     }
 
     try {
-      const existing = await USERS_COLLECTON
+      const existing = await USERS_COLLECTION
         .where('email', '==', email)
         .get();
 
@@ -52,7 +52,7 @@ router.post('/register',
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const userRef = await USERS_COLLECTON.add({
+      const userRef = await USERS_COLLECTION.add({
         email,
         password: hashedPassword,
         roles: ['guest'],
@@ -90,7 +90,7 @@ router.post('/login',
     }
 
     try {
-      const snapshot = await USERS_COLLECTON
+      const snapshot = await USERS_COLLECTION
         .where('email', '==', email)
         .limit(1)
         .get();

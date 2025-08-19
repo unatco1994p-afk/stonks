@@ -1,5 +1,5 @@
 import express from 'express';
-import INVESTMENT_COLLECTION from '../config/db.js';
+import { INVESTMENT_COLLECTION } from '../config/db.js';
 import { verifyToken } from '../config/auth.js';
 import { getPrice } from '../services/investments/fetch-value.js';
 import { body, validationResult } from 'express-validator';

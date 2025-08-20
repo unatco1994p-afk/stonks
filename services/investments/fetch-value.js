@@ -11,3 +11,9 @@ export async function getPrice(coin = "bitcoin", currency = "usd") {
   }
 }
 
+// TODO: implement cache in db
+
+export async function fetchCryptoPrice(cryptoSymbol, relativeToCurrency) {
+  // TODO
+}
+

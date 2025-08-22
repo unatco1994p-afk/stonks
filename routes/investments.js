@@ -2,7 +2,7 @@ import express from 'express';
 import { INVESTMENT_COLLECTION } from '../config/db.js';
 import { verifyToken } from '../config/auth.js';
 import { getPrice } from '../services/investments/fetch-value.js';
-import { body, validationResult } from 'express-validator';
+import { body } from 'express-validator';
 import asyncHandler from '../config/async-error-handler.js';
 import validateRequest from '../config/validate-request.js';
 
@@ -86,7 +86,7 @@ const validators = {
         .optional({ checkFalsy: true })
         .matches(/^(\d+(\.\d+)?)(,(\d+(\.\d+)?))*$/)
         .withMessage('interestsList must be a comma-separated list of positive numbers')
-        .customSanitizer(value => value.split(',').map(Number));
+        .customSanitizer(value => value.split(',').map(Number)),
     required$stakingInterest: body('stakingInterest')
         .exists().withMessage('stakingInterest is required')
         .isFloat({ min: 0.01 }).withMessage('stakingInterest must be positive value')

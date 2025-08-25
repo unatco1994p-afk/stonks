@@ -17,4 +17,8 @@ const db = new Firestore({
   databaseId: process.env.FIRESTORE_DB
 });
 
+export const USERS_COLLECTION = db.collection('users');
+export const INVESTMENT_COLLECTION = db.collection('testInvestments');
+export const LOGS_COLLECTION = db.collection('testMessages');
+
 export default db;

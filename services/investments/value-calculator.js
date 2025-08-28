@@ -95,7 +95,6 @@ function validateBond(bond) {
     const yearMs = 365 * 24 * 60 * 60 * 1000;
     const totalYears = Math.floor((parsedBond.dueDate - parsedBond.startDate) / yearMs);
 
-    console.log(parsedBond);
     if (parsedBond.interestsList.length < totalYears) {
         if (!parsedBond.interest) {
             throw new Error(`Could not determine interests, too little intrests in the list or interest not filled`);

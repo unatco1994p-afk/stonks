@@ -5,6 +5,7 @@ import { getPrice } from '../services/investments/fetch-value.js';
 import { body } from 'express-validator';
 import asyncHandler from '../config/async-error-handler.js';
 import validateRequest from '../config/validate-request.js';
+import { calculateCurrentBondValue } from '../services/investments/value-calculator.js';
 
 const validators = {
     required$name: body('name')
@@ -175,8 +176,9 @@ const bondValidators = [
     validators.optional$description,
     validators.required$volume,
     validators.required$price,
+    validators.required$currency,
     validators.required$bondTicker,
-    validators.required$interest,
+    validators.optional$interest,
     validators.optional$interestsList,
     validators.required$startDate,
     validators.required$dueDate
@@ -226,7 +228,11 @@ router.get('/cryptos/', verifyToken,
 router.get('/bonds/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
-        res.json(await getInvestmentsList(userId, 'bond'));
+        const bonds = await getInvestmentsList(userId, 'bond')
+        res.json(bonds.map(bond => ({
+            ...bond,
+            currentValue: calculateCurrentBondValue(bond)
+        })));
     })
 );
 
@@ -281,16 +287,25 @@ router.post('/bonds/', verifyToken, bondValidators,
         validateRequest(req);
 
         const userId = req.user.uid;
-        const { name, spot, description, volume, price, bondTicker, interest, interestsList, startDate, dueDate } = req.body;
+        const { name, spot, description, volume, currency, price, bondTicker, interest, interestsList, startDate, dueDate } = req.body;
+
+        let interestsListVar = interestsList;
+        if (interestsList === '') {
+            interestsListVar = [];
+        }
 
         const docRef = await INVESTMENT_COLLECTION.add({
             userId, investmentType: 'bond', //
-            name, spot, description, volume, price, bondTicker, interest, startDate, dueDate, //
+            name, spot, description, volume, currency, price, bondTicker, interest, 
+            interestsList: interestsListVar, 
+            startDate, dueDate, //
             createdAt: new Date()
         });
 
         res.status(201).json({ id: docRef.id, 
-            name, spot, description, volume, price, bondTicker, interest, startDate, dueDate
+            name, spot, description, volume, currency, price, bondTicker, interest,
+            interestsList: interestsListVar,
+            startDate, dueDate
         });
     })
 )
@@ -369,7 +384,7 @@ router.put('/bonds/:id', verifyToken, bondValidators,
 
         const userId = req.user.uid;
         const { id } = req.params;
-        const { name, spot, description, volume, price, bondTicker, interest, interestsList, startDate, dueDate } = req.body;
+        const { name, spot, description, volume, price, currency, bondTicker, interest, interestsList, startDate, dueDate } = req.body;
 
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
@@ -378,12 +393,21 @@ router.put('/bonds/:id', verifyToken, bondValidators,
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
+        let interestsListVar = interestsList;
+        if (interestsList === '') {
+            interestsListVar = [];
+        }
+
         await docRef.update({            
-            name, spot, description, volume, price, bondTicker, interest, interestsList, startDate, dueDate, //
+            name, spot, description, volume, price, currency, bondTicker, interest,
+            interestsList: interestsList,
+            startDate, dueDate, //
             updatedAt: new Date()
         });
 
-        res.json({ name, spot, description, volume, price, bondTicker, interest, interestsList, startDate, dueDate });
+        res.json({ name, spot, description, volume, price, currency, bondTicker, interest,
+            interestsList: interestsList,
+            startDate, dueDate });
     })
 )
 

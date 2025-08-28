@@ -15,9 +15,10 @@ const cryptoSchema = z.object({
 const bondSchema = z.object({
     volume: z.number().min(0, 'volume must be non-negative'),
     price: z.number().min(0, 'price must be non-negative'),
-    interestsList: z.array(z.number()).nonempty('interestsList cannot be empty'),
-    startDate: z.date(),
-    dueDate: z.date(),
+    interestsList: z.array(z.number()).optional(),
+    interest: z.number().optional(),
+    startDate: z.coerce.date(),
+    dueDate: z.coerce.date(),
 });
 
 export function calculateCurrentDepositValue(deposit) {
@@ -93,8 +94,13 @@ function validateBond(bond) {
     // check min interestsList number of elements
     const yearMs = 365 * 24 * 60 * 60 * 1000;
     const totalYears = Math.floor((parsedBond.dueDate - parsedBond.startDate) / yearMs);
+
+    console.log(parsedBond);
     if (parsedBond.interestsList.length < totalYears) {
-        throw new Error(`interestsList must have at least ${totalYears} elements`);
+        if (!parsedBond.interest) {
+            throw new Error(`Could not determine interests, too little intrests in the list or interest not filled`);
+        }
+        parsedBond.interestsList = Array(totalYears).fill(parsedBond.interest);
     }
 
     return parsedBond;

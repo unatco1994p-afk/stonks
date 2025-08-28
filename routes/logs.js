@@ -1,5 +1,5 @@
 import express from 'express';
-import db from '../config/db.js';
+import { LOGS_COLLECTION } from '../config/db.js';
 import { verifyToken } from '../config/auth.js';
 
 const router = express.Router();
@@ -37,7 +37,7 @@ router.post('/', verifyToken, async (req, res) => {
       createdAt: timestamp,
     };
 
-    const ref = await db.collection("testMessages").add(data);
+    const ref = await LOGS_COLLECTION.add(data);
 
     res.status(201).json({
       success: true,
@@ -52,7 +52,7 @@ router.post('/', verifyToken, async (req, res) => {
 // GET /logs
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const snapshot = await db.collection("testMessages")
+    const snapshot = await LOGS_COLLECTION
       .orderBy("createdAt", "desc")
       .get();
 

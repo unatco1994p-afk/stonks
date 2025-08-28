@@ -2,6 +2,7 @@ import express from 'express';
 import logsRouter from './logs.js';
 import authRouter from './auth.js';
 import adminUsersRouter from './admin-users.js';
+import investmentsRouter from './investments.js';
 
 const router = express.Router();
 
@@ -15,5 +16,6 @@ router.get('/', (req, res) => {
 router.use('/logs', logsRouter);
 router.use('/auth', authRouter);
 router.use('/admin-users', adminUsersRouter);
+router.use('/investments', investmentsRouter);
 
 export default router;

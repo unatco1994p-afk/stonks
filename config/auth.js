@@ -1,9 +1,7 @@
 import jwt from 'jsonwebtoken';
-import db from '../config/db.js';
+import { USERS_COLLECTION } from './db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'jwtsecretkey';
-
-const USERS_COLLECTION = 'users';
 
 export function generateToken(payload) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
@@ -32,7 +30,7 @@ export function verifyRole(requiredRole) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const userDoc = await db.collection(USERS_COLLECTION).doc(req.user.uid).get();
+      const userDoc = await USERS_COLLECTION.doc(req.user.uid).get();
       if (!userDoc.exists) {
         return res.status(404).json({ error: 'User not found' });
       }

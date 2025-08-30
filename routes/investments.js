@@ -5,7 +5,7 @@ import { body } from 'express-validator';
 import asyncHandler from '../config/async-error-handler.js';
 import validateRequest from '../config/validate-request.js';
 import { calculateCurrentBondValue, calculateCurrentDepositValue, calculateCurrentCryptoValue } from '../services/investments/value-calculator.js';
-import { fetchCryptoPrice, fetchStockPriceGPW } from '../services/investments/fetch-value.js';
+import { fetchCryptoPrices, fetchStockPriceGPW } from '../services/investments/fetch-value.js';
 
 const validators = {
     required$name: body('name')
@@ -222,15 +222,15 @@ router.post('/current-values/', verifyToken,
             ...deposit,
             currentValue: calculateCurrentDepositValue(deposit)
         }));
-        const newCryptos = await Promise.all(
-            cryptos.map(async crypto => {
-                const price = await fetchCryptoPrice(crypto.cryptoSymbol, 'pln') || 0;
-                return {
-                    ...crypto,
-                    currentValue: +calculateCurrentCryptoValue(crypto) * +price,
-                };
-            })
-        );
+        const symbols = cryptos.map(c => c.cryptoSymbol);
+        const prices = await fetchCryptoPrices(symbols, 'pln'); 
+        const newCryptos = cryptos.map(crypto => {
+            const price = prices[crypto.cryptoSymbol.toUpperCase()] || 0;
+            return {
+                ...crypto,
+                currentValue: +calculateCurrentCryptoValue(crypto) * +price,
+            };
+        });
         const newBonds = bonds.map(bond => ({
             ...bond,
             currentValue: calculateCurrentBondValue(bond)

@@ -12,15 +12,11 @@ const coinMap = JSON.parse(fs.readFileSync(coinMapPath, 'utf-8'));
 
 console.log(coinMap);
 
-/**
- * Pobiera cenę kryptowaluty po CoinGecko ID i walucie
- * @param {string} coinId - np. "bitcoin"
- * @param {string} currency - np. "pln"
- * @returns {Promise<number|null>}
- */
-async function getPrice(coinId = 'bitcoin', currency = 'usd') {
+// Batch pobierania wielu krypto
+async function getPriceBatch(coinIds = [], currency = 'pln') {
     try {
-        const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=${currency}`;
+        const idsParam = coinIds.join(','); // np. "bitcoin,ethereum"
+        const url = `https://api.coingecko.com/api/v3/simple/price?ids=${idsParam}&vs_currencies=${currency}`;
 
         return await new Promise((resolve, reject) => {
             https.get(url, (res) => {
@@ -32,7 +28,7 @@ async function getPrice(coinId = 'bitcoin', currency = 'usd') {
                     }
                     try {
                         const json = JSON.parse(data);
-                        resolve(json[coinId][currency]);
+                        resolve(json);
                     } catch (err) {
                         reject(err);
                     }
@@ -40,30 +36,35 @@ async function getPrice(coinId = 'bitcoin', currency = 'usd') {
             }).on('error', reject);
         });
     } catch (err) {
-        console.error('Error fetching price:', err.message);
+        console.error('Error fetching prices:', err.message);
         return null;
     }
 }
 
-/**
- * Pobiera cenę kryptowaluty po tickerze i walucie
- * @param {string} cryptoSymbol - np. "BTC"
- * @param {string} relativeToCurrency - np. "PLN"
- * @returns {Promise<number|null>}
- */
-export async function fetchCryptoPrice(cryptoSymbol, relativeToCurrency = 'pln') {
-const symbol = cryptoSymbol.toLowerCase();
-    const coin = coinMap.find(c => c.symbol.toLowerCase() === symbol);
+export async function fetchCryptoPrices(symbols, relativeToCurrency = 'pln') {
+    const lowerSymbols = symbols.map(s => s.toLowerCase());
+    const coins = coinMap.filter(c => lowerSymbols.includes(c.symbol.toLowerCase()));
 
-    console.log(coin);
+    // Mapowanie symbol -> id (tylko dla znalezionych)
+    const coinIds = coins.map(c => c.id);
 
-    if (!coin) {
-        console.error(`Symbol ${symbol} not found in crypto.json`);
-        return null;
+    // Pobranie cen
+    const prices = coinIds.length > 0
+        ? await getPriceBatch(coinIds, relativeToCurrency.toLowerCase())
+        : {};
+
+    // Zbudowanie finalnego wyniku dla WSZYSTKICH wejściowych symboli
+    const result = {};
+    for (const symbol of symbols) {
+        const coin = coinMap.find(c => c.symbol.toLowerCase() === symbol.toLowerCase());
+        if (coin && prices[coin.id]) {
+            result[symbol.toUpperCase()] = prices[coin.id][relativeToCurrency.toLowerCase()];
+        } else {
+            result[symbol.toUpperCase()] = null; // fallback dla brakujących
+        }
     }
 
-    const price = await getPrice(coin.id, relativeToCurrency.toLowerCase());
-    return price;
+    return result;
 }
 
 /**

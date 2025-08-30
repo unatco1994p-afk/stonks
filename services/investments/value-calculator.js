@@ -3,13 +3,13 @@ import { z } from 'zod';
 const depositSchema = z.object({
     value: z.number(),
     interest: z.number(),
-    startDate: z.date(),
+    startDate: z.coerce.date(),
 });
 
 const cryptoSchema = z.object({
     quantity: z.number(),
     stakingInterest: z.number(),
-    startDate: z.date(),
+    startDate: z.coerce.date(),
 });
 
 const bondSchema = z.object({
@@ -81,6 +81,7 @@ export function calculateCryptoStakeValueAtDate(crypto, targetDate) {
     const tYears = tMilliseconds / (1000 * 60 * 60 * 24 * 365.25);
 
     const r = parsedCrypto.stakingInterest / 100;
+
     return parsedCrypto.quantity * Math.exp(r * tYears);
 }
 

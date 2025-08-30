@@ -1,11 +1,11 @@
 import express from 'express';
-import { INVESTMENT_COLLECTION } from '../config/db.js';
+import db, { INVESTMENT_COLLECTION } from '../config/db.js';
 import { verifyToken } from '../config/auth.js';
-import { getPrice } from '../services/investments/fetch-value.js';
 import { body } from 'express-validator';
 import asyncHandler from '../config/async-error-handler.js';
 import validateRequest from '../config/validate-request.js';
-import { calculateCurrentBondValue } from '../services/investments/value-calculator.js';
+import { calculateCurrentBondValue, calculateCurrentDepositValue, calculateCurrentCryptoValue } from '../services/investments/value-calculator.js';
+import { fetchCryptoPrice, fetchStockPriceGPW } from '../services/investments/fetch-value.js';
 
 const validators = {
     required$name: body('name')
@@ -210,9 +210,77 @@ async function getInvestmentsList(userId, investmentType) {
 
 const router = express.Router();
 
+router.post('/current-values/', verifyToken,
+    asyncHandler(async (req, res) => {
+        const userId = req.user.uid;
+        const deposits = await getInvestmentsList(userId, 'deposit');
+        const cryptos = await getInvestmentsList(userId, 'crypto');
+        const bonds = await getInvestmentsList(userId, 'bond');
+        const stocks = await getInvestmentsList(userId, 'stock');
+
+        const newDeposits = deposits.map(deposit => ({
+            ...deposit,
+            currentValue: calculateCurrentDepositValue(deposit)
+        }));
+        const newCryptos = await Promise.all(
+            cryptos.map(async crypto => {
+                const price = await fetchCryptoPrice(crypto.cryptoSymbol, 'pln') || 0;
+                return {
+                    ...crypto,
+                    currentValue: +calculateCurrentCryptoValue(crypto) * +price,
+                };
+            })
+        );
+        const newBonds = bonds.map(bond => ({
+            ...bond,
+            currentValue: calculateCurrentBondValue(bond)
+        }));
+        const newStocks = await Promise.all(
+            stocks.map(async stock => {
+                const price = await fetchStockPriceGPW(stock.stockTicker);
+                return {
+                    ...stock,
+                    currentValue: +price * stock.volume,
+                };
+            })
+        );
+
+        const allInvestments = [
+            ...newDeposits,
+            ...newCryptos,
+            ...newBonds,
+            ...newStocks
+        ];
+
+        await commitInBatches(allInvestments);
+        res.json({ success: true });
+    })
+)
+
+async function commitInBatches(investments) {
+    const chunkSize = 500;
+    const now = new Date();
+
+    for (let i = 0; i < investments.length; i += chunkSize) {
+        const batch = db.batch();
+        const chunk = investments.slice(i, i + chunkSize);
+
+        chunk.forEach(inv => {
+            const ref = INVESTMENT_COLLECTION.doc(inv.id);
+            batch.update(ref, {
+                currentValue: inv.currentValue,
+                lastRecalculationDate: now,
+            });
+        });
+
+        await batch.commit();
+        console.log(`✅ Committed ${i + chunk.length}/${investments.length}`);
+    }
+}
+
 /** GET ALL */
 router.get('/deposits/', verifyToken,
-    asyncHandler(async (req, res) => { 
+    asyncHandler(async (req, res) => {
         const userId = req.user.uid;
         res.json(await getInvestmentsList(userId, 'deposit'));
     })
@@ -228,11 +296,7 @@ router.get('/cryptos/', verifyToken,
 router.get('/bonds/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
-        const bonds = await getInvestmentsList(userId, 'bond')
-        res.json(bonds.map(bond => ({
-            ...bond,
-            currentValue: calculateCurrentBondValue(bond)
-        })));
+        res.json(await getInvestmentsList(userId, 'bond'));
     })
 );
 
@@ -257,7 +321,8 @@ router.post('/deposits/', verifyToken, depositValidators,
             createdAt: new Date()
         });
 
-        res.status(201).json({ id: docRef.id, 
+        res.status(201).json({
+            id: docRef.id,
             name, spot, description, value, currency, interest, startDate
         });
     })
@@ -276,7 +341,8 @@ router.post('/cryptos/', verifyToken, cryptoValidators,
             createdAt: new Date()
         });
 
-        res.status(201).json({ id: docRef.id, 
+        res.status(201).json({
+            id: docRef.id,
             name, spot, description, quantity, priceAtStartDate, priceRelativeToCurrency, cryptoSymbol, stakingInterest, startDate
         });
     })
@@ -296,13 +362,14 @@ router.post('/bonds/', verifyToken, bondValidators,
 
         const docRef = await INVESTMENT_COLLECTION.add({
             userId, investmentType: 'bond', //
-            name, spot, description, volume, currency, price, bondTicker, interest, 
-            interestsList: interestsListVar, 
+            name, spot, description, volume, currency, price, bondTicker, interest,
+            interestsList: interestsListVar,
             startDate, dueDate, //
             createdAt: new Date()
         });
 
-        res.status(201).json({ id: docRef.id, 
+        res.status(201).json({
+            id: docRef.id,
             name, spot, description, volume, currency, price, bondTicker, interest,
             interestsList: interestsListVar,
             startDate, dueDate
@@ -323,7 +390,8 @@ router.post('/stocks/', verifyToken, stockValidators,
             createdAt: new Date()
         });
 
-        res.status(201).json({ id: docRef.id, 
+        res.status(201).json({
+            id: docRef.id,
             name, spot, description, volume, price, priceRelativeToCurrency, startDate, stockTicker, dividend
         });
     })
@@ -345,12 +413,12 @@ router.put('/deposits/:id', verifyToken, depositValidators,
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
-        await docRef.update({            
-            name, spot, description, value, currency, interest, interestsList, startDate, //
+        await docRef.update({
+            name, spot, description, value, currency, interest, startDate, //
             updatedAt: new Date()
         });
 
-        res.json({ id, name, spot, description, value, currency, interest, interestsList, startDate });
+        res.json({ id, name, spot, description, value, currency, interest, startDate });
     })
 );
 
@@ -369,7 +437,7 @@ router.put('/cryptos/:id', verifyToken, cryptoValidators,
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
-        await docRef.update({            
+        await docRef.update({
             name, spot, description, quantity, priceAtStartDate, priceRelativeToCurrency, cryptoSymbol, stakingInterest, startDate, //
             updatedAt: new Date()
         });
@@ -398,16 +466,18 @@ router.put('/bonds/:id', verifyToken, bondValidators,
             interestsListVar = [];
         }
 
-        await docRef.update({            
+        await docRef.update({
             name, spot, description, volume, price, currency, bondTicker, interest,
-            interestsList: interestsList,
+            interestsList: interestsListVar,
             startDate, dueDate, //
             updatedAt: new Date()
         });
 
-        res.json({ name, spot, description, volume, price, currency, bondTicker, interest,
-            interestsList: interestsList,
-            startDate, dueDate });
+        res.json({
+            name, spot, description, volume, price, currency, bondTicker, interest,
+            interestsList: interestsListVar,
+            startDate, dueDate
+        });
     })
 )
 
@@ -426,7 +496,7 @@ router.put('/stocks/:id', verifyToken, stockValidators,
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
-        await docRef.update({            
+        await docRef.update({
             name, spot, description, volume, price, priceRelativeToCurrency, startDate, stockTicker, dividend, //
             updatedAt: new Date()
         });
@@ -436,7 +506,7 @@ router.put('/stocks/:id', verifyToken, stockValidators,
 )
 
 /** REMOVE EXISTING */
-router.delete('/deposits/:id', verifyToken, 
+router.delete('/deposits/:id', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
         const { id } = req.params;

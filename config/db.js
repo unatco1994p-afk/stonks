@@ -33,8 +33,8 @@ const db = new Firestore({
 });
 
 export const USERS_COLLECTION = db.collection('users').withConverter(globalConverter);
-export const INVESTMENT_COLLECTION = db.collection('testInvestments').withConverter(globalConverter);
-export const LOGS_COLLECTION = db.collection('testMessages').withConverter(globalConverter);
+export const INVESTMENT_COLLECTION = db.collection('investments').withConverter(globalConverter);
+export const LOGS_COLLECTION = db.collection('logs').withConverter(globalConverter);
 
 export default db;
 

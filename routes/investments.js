@@ -178,8 +178,7 @@ const bondValidators = [
     validators.required$price,
     validators.required$currency,
     validators.required$bondTicker,
-    validators.optional$interest,
-    validators.optional$interestsList,
+    validators.required$interestsList,
     validators.required$startDate,
     validators.required$dueDate
 ];
@@ -353,7 +352,7 @@ router.post('/bonds/', verifyToken, bondValidators,
         validateRequest(req);
 
         const userId = req.user.uid;
-        const { name, spot, description, volume, currency, price, bondTicker, interest, interestsList, startDate, dueDate } = req.body;
+        const { name, spot, description, volume, currency, price, bondTicker, interestsList, startDate, dueDate } = req.body;
 
         let interestsListVar = interestsList;
         if (interestsList === '') {
@@ -362,7 +361,7 @@ router.post('/bonds/', verifyToken, bondValidators,
 
         const docRef = await INVESTMENT_COLLECTION.add({
             userId, investmentType: 'bond', //
-            name, spot, description, volume, currency, price, bondTicker, interest,
+            name, spot, description, volume, currency, price, bondTicker,
             interestsList: interestsListVar,
             startDate, dueDate, //
             createdAt: new Date()
@@ -370,7 +369,7 @@ router.post('/bonds/', verifyToken, bondValidators,
 
         res.status(201).json({
             id: docRef.id,
-            name, spot, description, volume, currency, price, bondTicker, interest,
+            name, spot, description, volume, currency, price, bondTicker,
             interestsList: interestsListVar,
             startDate, dueDate
         });
@@ -452,7 +451,7 @@ router.put('/bonds/:id', verifyToken, bondValidators,
 
         const userId = req.user.uid;
         const { id } = req.params;
-        const { name, spot, description, volume, price, currency, bondTicker, interest, interestsList, startDate, dueDate } = req.body;
+        const { name, spot, description, volume, price, currency, bondTicker, interestsList, startDate, dueDate } = req.body;
 
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
@@ -467,14 +466,14 @@ router.put('/bonds/:id', verifyToken, bondValidators,
         }
 
         await docRef.update({
-            name, spot, description, volume, price, currency, bondTicker, interest,
+            name, spot, description, volume, price, currency, bondTicker,
             interestsList: interestsListVar,
             startDate, dueDate, //
             updatedAt: new Date()
         });
 
         res.json({
-            name, spot, description, volume, price, currency, bondTicker, interest,
+            name, spot, description, volume, price, currency, bondTicker,
             interestsList: interestsListVar,
             startDate, dueDate
         });

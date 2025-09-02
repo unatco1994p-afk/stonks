@@ -254,7 +254,7 @@ router.post('/current-values/', verifyToken,
         await commitInBatches(allInvestments);
         res.json({ success: true });
     })
-)
+);
 
 async function commitInBatches(investments) {
     const chunkSize = 500;

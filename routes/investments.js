@@ -196,10 +196,13 @@ const stockValidators = [
 ];
 
 async function getInvestmentsList(userId, investmentType) {
-    const snapshot = await INVESTMENT_COLLECTION
-        .where('userId', '==', userId)
-        .where('investmentType', '==', investmentType)
-        .get();
+    let query = INVESTMENT_COLLECTION.where('userId', '==', userId);
+
+    if (investmentType !== null && investmentType !== undefined) {
+        query = query.where('investmentType', '==', investmentType);
+    }
+
+    const snapshot = await query.get();
 
     return snapshot.docs.map(doc => ({
         id: doc.id,
@@ -212,10 +215,12 @@ const router = express.Router();
 router.post('/current-values/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
-        const deposits = await getInvestmentsList(userId, 'deposit');
-        const cryptos = await getInvestmentsList(userId, 'crypto');
-        const bonds = await getInvestmentsList(userId, 'bond');
-        const stocks = await getInvestmentsList(userId, 'stock');
+        const all = await getInvestmentsList(userId, null);
+
+        const deposits = all.filter(inv => inv.investmentType === 'deposit');
+        const cryptos = all.filter(inv => inv.investmentType === 'crypto');
+        const bonds = all.filter(inv => inv.investmentType === 'bond');
+        const stocks = all.filter(inv => inv.investmentType === 'stock');
 
         const newDeposits = deposits.map(deposit => ({
             ...deposit,

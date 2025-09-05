@@ -25,14 +25,14 @@ router.get('/', verifyToken,
     asyncHandler( async (req, res) => {
         const userId = req.user.uid;
         
-        const snapshot = await USERS_COLLECTION
-            .where('id', '==', userId)
-            .limit(1)
-            .get();
+        const docRef = USERS_COLLECTION.doc(userId);
+        const docSnap = await docRef.get();
 
-        const userDoc = snapshot.docs[0];
-        const userData = userDoc.data();
+        if (!docSnap.exists) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
+        const userData = docSnap.data() || {};
         const preferences = userData.preferences ?? {};
 
         res.json({

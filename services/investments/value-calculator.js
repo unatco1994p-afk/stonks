@@ -15,8 +15,7 @@ const cryptoSchema = z.object({
 const bondSchema = z.object({
     volume: z.number().min(0, 'volume must be non-negative'),
     price: z.number().min(0, 'price must be non-negative'),
-    interestsList: z.array(z.number()).optional(),
-    interest: z.number().optional(),
+    interestsList: z.array(z.number()),
     startDate: z.coerce.date(),
     dueDate: z.coerce.date(),
 });
@@ -96,13 +95,6 @@ function validateBond(bond) {
     const yearMs = 365 * 24 * 60 * 60 * 1000;
     const totalYears = Math.floor((parsedBond.dueDate - parsedBond.startDate) / yearMs);
 
-    if (parsedBond.interestsList.length < totalYears) {
-        if (!parsedBond.interest) {
-            throw new Error(`Could not determine interests, too little intrests in the list or interest not filled`);
-        }
-        parsedBond.interestsList = Array(totalYears).fill(parsedBond.interest);
-    }
-
     return parsedBond;
 }
 
@@ -112,6 +104,7 @@ export function calculateCurrentBondValue(bond) {
 
 export function calculateBondValueAtDate(bond, targetDate) {
     const parsedBond = validateBond(bond);
+
     if (!(targetDate instanceof Date)) {
         throw new Error('targetDate must be a Date');
     }
@@ -126,20 +119,29 @@ export function calculateBondValueAtDate(bond, targetDate) {
     const yearMs = 365 * 24 * 60 * 60 * 1000;
     let value = parsedBond.volume * parsedBond.price;
 
+    const interests = Array.isArray(parsedBond.interestsList) ? parsedBond.interestsList : [];
     const elapsedYears = Math.floor((targetTime - startTime) / yearMs);
 
+    // pomocnicza funkcja do pobierania oprocentowania z fallbackiem
+    const getInterest = (yearIndex) => {
+        if (yearIndex < 0) return 0;
+        if (yearIndex < interests.length && typeof interests[yearIndex] === 'number') {
+            return interests[yearIndex];
+        }
+        return getInterest(yearIndex - 1); // fallback do poprzedniego roku
+    };
+
+    // naliczanie całych lat
     for (let i = 0; i < elapsedYears; i++) {
-        if (i >= parsedBond.interestsList.length) break;
-        value *= 1 + parsedBond.interestsList[i] / 100;
+        const interest = getInterest(i) / 100;
+        value *= 1 + interest;
     }
 
-    // proportional increase
-    if (elapsedYears < parsedBond.interestsList.length) {
-        const yearStartTime = startTime + elapsedYears * yearMs;
-        const elapsedMs = targetTime - yearStartTime;
-        const interest = parsedBond.interestsList[elapsedYears] / 100;
-        value += value * interest * (elapsedMs / yearMs);
-    }
+    // proporcjonalny wzrost w bieżącym roku
+    const interest = getInterest(elapsedYears) / 100;
+    const yearStartTime = startTime + elapsedYears * yearMs;
+    const elapsedMs = targetTime - yearStartTime;
+    value += value * interest * (elapsedMs / yearMs);
 
     return value;
 }

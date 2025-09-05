@@ -178,8 +178,7 @@ const bondValidators = [
     validators.required$price,
     validators.required$currency,
     validators.required$bondTicker,
-    validators.optional$interest,
-    validators.optional$interestsList,
+    validators.required$interestsList,
     validators.required$startDate,
     validators.required$dueDate
 ];
@@ -197,10 +196,13 @@ const stockValidators = [
 ];
 
 async function getInvestmentsList(userId, investmentType) {
-    const snapshot = await INVESTMENT_COLLECTION
-        .where('userId', '==', userId)
-        .where('investmentType', '==', investmentType)
-        .get();
+    let query = INVESTMENT_COLLECTION.where('userId', '==', userId);
+
+    if (investmentType !== null && investmentType !== undefined) {
+        query = query.where('investmentType', '==', investmentType);
+    }
+
+    const snapshot = await query.get();
 
     return snapshot.docs.map(doc => ({
         id: doc.id,
@@ -213,10 +215,12 @@ const router = express.Router();
 router.post('/current-values/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
-        const deposits = await getInvestmentsList(userId, 'deposit');
-        const cryptos = await getInvestmentsList(userId, 'crypto');
-        const bonds = await getInvestmentsList(userId, 'bond');
-        const stocks = await getInvestmentsList(userId, 'stock');
+        const all = await getInvestmentsList(userId, null);
+
+        const deposits = all.filter(inv => inv.investmentType === 'deposit');
+        const cryptos = all.filter(inv => inv.investmentType === 'crypto');
+        const bonds = all.filter(inv => inv.investmentType === 'bond');
+        const stocks = all.filter(inv => inv.investmentType === 'stock');
 
         const newDeposits = deposits.map(deposit => ({
             ...deposit,
@@ -255,7 +259,7 @@ router.post('/current-values/', verifyToken,
         await commitInBatches(allInvestments);
         res.json({ success: true });
     })
-)
+);
 
 async function commitInBatches(investments) {
     const chunkSize = 500;
@@ -353,7 +357,7 @@ router.post('/bonds/', verifyToken, bondValidators,
         validateRequest(req);
 
         const userId = req.user.uid;
-        const { name, spot, description, volume, currency, price, bondTicker, interest, interestsList, startDate, dueDate } = req.body;
+        const { name, spot, description, volume, currency, price, bondTicker, interestsList, startDate, dueDate } = req.body;
 
         let interestsListVar = interestsList;
         if (interestsList === '') {
@@ -362,7 +366,7 @@ router.post('/bonds/', verifyToken, bondValidators,
 
         const docRef = await INVESTMENT_COLLECTION.add({
             userId, investmentType: 'bond', //
-            name, spot, description, volume, currency, price, bondTicker, interest,
+            name, spot, description, volume, currency, price, bondTicker,
             interestsList: interestsListVar,
             startDate, dueDate, //
             createdAt: new Date()
@@ -370,7 +374,7 @@ router.post('/bonds/', verifyToken, bondValidators,
 
         res.status(201).json({
             id: docRef.id,
-            name, spot, description, volume, currency, price, bondTicker, interest,
+            name, spot, description, volume, currency, price, bondTicker,
             interestsList: interestsListVar,
             startDate, dueDate
         });
@@ -452,7 +456,7 @@ router.put('/bonds/:id', verifyToken, bondValidators,
 
         const userId = req.user.uid;
         const { id } = req.params;
-        const { name, spot, description, volume, price, currency, bondTicker, interest, interestsList, startDate, dueDate } = req.body;
+        const { name, spot, description, volume, price, currency, bondTicker, interestsList, startDate, dueDate } = req.body;
 
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
@@ -467,14 +471,14 @@ router.put('/bonds/:id', verifyToken, bondValidators,
         }
 
         await docRef.update({
-            name, spot, description, volume, price, currency, bondTicker, interest,
+            name, spot, description, volume, price, currency, bondTicker,
             interestsList: interestsListVar,
             startDate, dueDate, //
             updatedAt: new Date()
         });
 
         res.json({
-            name, spot, description, volume, price, currency, bondTicker, interest,
+            name, spot, description, volume, price, currency, bondTicker,
             interestsList: interestsListVar,
             startDate, dueDate
         });

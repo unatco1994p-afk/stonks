@@ -36,6 +36,8 @@ export const USERS_COLLECTION = db.collection('users').withConverter(globalConve
 export const INVESTMENT_COLLECTION = db.collection('investments').withConverter(globalConverter);
 export const LOGS_COLLECTION = db.collection('logs').withConverter(globalConverter);
 
+export const PRICES_CACHE_COLLECTION = db.collection('pricesCache').withConverter(globalConverter);
+
 export default db;
 
 /**

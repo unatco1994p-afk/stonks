@@ -10,8 +10,6 @@ const __dirname = path.dirname(__filename);
 const coinMapPath = path.resolve(__dirname, '../../config/crypto.json');
 const coinMap = JSON.parse(fs.readFileSync(coinMapPath, 'utf-8'));
 
-console.log(coinMap);
-
 // Batch pobierania wielu krypto
 async function getPriceBatch(coinIds = [], currency = 'pln') {
     try {
@@ -93,6 +91,25 @@ export async function fetchStockPriceGPW(stockTicker) {
         return closingPrice;
     } catch (err) {
         console.error('Error fetching stock price from Stooq:', err.message);
+        return null;
+    }
+}
+
+export async function fetchCurrencyPrice(currency, relativeTo = 'PLN') {
+    try {
+        if (currency.toUpperCase() === relativeTo.toUpperCase()) {
+            return 1;
+        }
+
+        const url = `https://api.nbp.pl/api/exchangerates/rates/A/${currency.toUpperCase()}/?format=json`;
+        const res = await fetch(url);
+
+        if (!res.ok) throw new Error(`NBP API error: ${res.status}`);
+
+        const data = await res.json();
+        return data.rates[0].mid; // kurs średni
+    } catch (err) {
+        console.error(`❌ Error fetching currency price for ${currency}/${relativeTo}:`, err.message);
         return null;
     }
 }

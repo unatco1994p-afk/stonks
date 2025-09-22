@@ -5,7 +5,7 @@ import { body } from 'express-validator';
 import asyncHandler from '../config/async-error-handler.js';
 import validateRequest from '../config/validate-request.js';
 import { calculateCurrentBondValue, calculateCurrentDepositValue, calculateCurrentCryptoValue } from '../services/investments/value-calculator.js';
-import { fetchCryptoPrices, fetchStockPriceGPW } from '../services/investments/fetch-value.js';
+import { getAllCachedPrices } from '../services/investments/price-cache.js';
 
 const validators = {
     required$name: body('name')
@@ -212,6 +212,18 @@ async function getInvestmentsList(userId, investmentType) {
 
 const router = express.Router();
 
+router.get('/currencies/', verifyToken,
+    asyncHandler(async (req, res) => {
+        const cache = await getAllCachedPrices();
+
+        const cachedUsd = cache[`currency_USD`]?.value ?? 0;
+        const cachedEur = cache[`currency_EUR`]?.value ?? 0;
+        // TODO: more currencies
+
+        res.json({pln: 1, eur: cachedEur, usd: cachedUsd});
+    })
+);
+
 router.post('/current-values/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
@@ -222,32 +234,40 @@ router.post('/current-values/', verifyToken,
         const bonds = all.filter(inv => inv.investmentType === 'bond');
         const stocks = all.filter(inv => inv.investmentType === 'stock');
 
+        // pobieramy WSZYSTKO z cache na raz
+        const cache = await getAllCachedPrices();
+
+        // --- deposits ---
         const newDeposits = deposits.map(deposit => ({
             ...deposit,
             currentValue: calculateCurrentDepositValue(deposit)
         }));
-        const symbols = cryptos.map(c => c.cryptoSymbol);
-        const prices = await fetchCryptoPrices(symbols, 'pln'); 
+
+        // --- cryptos ---
         const newCryptos = cryptos.map(crypto => {
-            const price = prices[crypto.cryptoSymbol.toUpperCase()] || 0;
+            const cached = cache[`crypto_${crypto.cryptoSymbol}`];
+            const price = cached?.value ?? 0;
             return {
                 ...crypto,
                 currentValue: +calculateCurrentCryptoValue(crypto) * +price,
             };
         });
+
+        // --- bonds ---
         const newBonds = bonds.map(bond => ({
             ...bond,
             currentValue: calculateCurrentBondValue(bond)
         }));
-        const newStocks = await Promise.all(
-            stocks.map(async stock => {
-                const price = await fetchStockPriceGPW(stock.stockTicker);
-                return {
-                    ...stock,
-                    currentValue: +price * stock.volume,
-                };
-            })
-        );
+
+        // --- stocks ---
+        const newStocks = stocks.map(stock => {
+            const cached = cache[`gpwStock_${stock.stockTicker}`];
+            const price = cached?.value ?? 0;
+            return {
+                ...stock,
+                currentValue: +price * stock.volume,
+            };
+        });
 
         const allInvestments = [
             ...newDeposits,
@@ -278,7 +298,6 @@ async function commitInBatches(investments) {
         });
 
         await batch.commit();
-        console.log(`✅ Committed ${i + chunk.length}/${investments.length}`);
     }
 }
 

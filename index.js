@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import routes from './routes/main.js';
 import { verifyToken } from './config/auth.js';
+import { scheduleTask } from './services/investments/price-cache.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -22,3 +23,5 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
     console.log(`App listening on port ${PORT}`);
 });
+
+scheduleTask();

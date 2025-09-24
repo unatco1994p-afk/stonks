@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import routes from './routes/main.js';
 import { verifyToken } from './config/auth.js';
-import { scheduleTask } from './services/investments/price-cache.js';
+import { fetchInvestmentsPrices } from './services/investments/price-cache.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -24,4 +24,9 @@ app.listen(PORT, () => {
     console.log(`App listening on port ${PORT}`);
 });
 
-scheduleTask();
+if (process.env.RUN_INIT_TASKS) {
+    setTimeout(() => {
+        await fetchInvestmentsPrices();
+        await calculateCurrentValueForAllUsers();
+    }, 100);
+}

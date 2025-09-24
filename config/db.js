@@ -33,7 +33,10 @@ const db = new Firestore({
 });
 
 export const USERS_COLLECTION = db.collection('users').withConverter(globalConverter);
+
 export const INVESTMENT_COLLECTION = db.collection('investments').withConverter(globalConverter);
+export const INVESTMENT_AGGREGATE_COLLECTION = db.collection('investmentAggregate').withConverter(globalConverter);
+
 export const LOGS_COLLECTION = db.collection('logs').withConverter(globalConverter);
 
 export const PRICES_CACHE_COLLECTION = db.collection('pricesCache').withConverter(globalConverter);

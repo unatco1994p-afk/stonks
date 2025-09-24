@@ -93,7 +93,7 @@ async function updateDocsBatch(updates) {
   }
 }
 
-async function runTask() {
+async function fetchInvestmentsPrices() {
     const now = Date.now();
     console.log('Run price fetch task...');
 
@@ -176,9 +176,4 @@ export async function getCachedPrice(type, name) {
         currency: data.price?.currency ?? 'PLN',
         lastCalculated: data.lastCalculated ?? 0,
     };
-}
-
-export function scheduleTask() {
-    runTask();
-    setInterval(runTask, CACHE_TTL_MS);
 }

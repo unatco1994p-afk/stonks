@@ -6,6 +6,8 @@ import asyncHandler from '../config/async-error-handler.js';
 import validateRequest from '../config/validate-request.js';
 import { calculateCurrentBondValue, calculateCurrentDepositValue, calculateCurrentCryptoValue } from '../services/investments/value-calculator.js';
 import { getAllCachedPrices } from '../services/investments/price-cache.js';
+import { getTotalPortfolio } from '../services/investments/aggregate.js';
+import { getInvestmentsList, calculateCurrentValue, DEPOSIT_TYPE, CRYPTO_TYPE, BOND_TYPE, STOCK_TYPE } from '../repository/investments-repository.js';
 
 const validators = {
     required$name: body('name')
@@ -195,22 +197,17 @@ const stockValidators = [
     validators.optional$dividend
 ];
 
-async function getInvestmentsList(userId, investmentType) {
-    let query = INVESTMENT_COLLECTION.where('userId', '==', userId);
-
-    if (investmentType !== null && investmentType !== undefined) {
-        query = query.where('investmentType', '==', investmentType);
-    }
-
-    const snapshot = await query.get();
-
-    return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-    }));
-}
-
 const router = express.Router();
+
+router.get('/total-portfolio/', verifyToken,
+    asyncHandler(async (req, res) => {
+        const userId = req.user.uid;
+
+        const total = getTotalPortfolio(userId);
+
+        res.json(total);
+    })
+);
 
 router.get('/currencies/', verifyToken,
     asyncHandler(async (req, res) => {
@@ -224,109 +221,42 @@ router.get('/currencies/', verifyToken,
     })
 );
 
+// TODO: will be removed
 router.post('/current-values/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
-        const all = await getInvestmentsList(userId, null);
+        await calculateCurrentValue(userId);
 
-        const deposits = all.filter(inv => inv.investmentType === 'deposit');
-        const cryptos = all.filter(inv => inv.investmentType === 'crypto');
-        const bonds = all.filter(inv => inv.investmentType === 'bond');
-        const stocks = all.filter(inv => inv.investmentType === 'stock');
-
-        // pobieramy WSZYSTKO z cache na raz
-        const cache = await getAllCachedPrices();
-
-        // --- deposits ---
-        const newDeposits = deposits.map(deposit => ({
-            ...deposit,
-            currentValue: calculateCurrentDepositValue(deposit)
-        }));
-
-        // --- cryptos ---
-        const newCryptos = cryptos.map(crypto => {
-            const cached = cache[`crypto_${crypto.cryptoSymbol}`];
-            const price = cached?.value ?? 0;
-            return {
-                ...crypto,
-                currentValue: +calculateCurrentCryptoValue(crypto) * +price,
-            };
-        });
-
-        // --- bonds ---
-        const newBonds = bonds.map(bond => ({
-            ...bond,
-            currentValue: calculateCurrentBondValue(bond)
-        }));
-
-        // --- stocks ---
-        const newStocks = stocks.map(stock => {
-            const cached = cache[`gpwStock_${stock.stockTicker}`];
-            const price = cached?.value ?? 0;
-            return {
-                ...stock,
-                currentValue: +price * stock.volume,
-            };
-        });
-
-        const allInvestments = [
-            ...newDeposits,
-            ...newCryptos,
-            ...newBonds,
-            ...newStocks
-        ];
-
-        await commitInBatches(allInvestments);
         res.json({ success: true });
     })
 );
-
-async function commitInBatches(investments) {
-    const chunkSize = 500;
-    const now = new Date();
-
-    for (let i = 0; i < investments.length; i += chunkSize) {
-        const batch = db.batch();
-        const chunk = investments.slice(i, i + chunkSize);
-
-        chunk.forEach(inv => {
-            const ref = INVESTMENT_COLLECTION.doc(inv.id);
-            batch.update(ref, {
-                currentValue: inv.currentValue,
-                lastRecalculationDate: now,
-            });
-        });
-
-        await batch.commit();
-    }
-}
 
 /** GET ALL */
 router.get('/deposits/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
-        res.json(await getInvestmentsList(userId, 'deposit'));
+        res.json(await getInvestmentsList(userId, DEPOSIT_TYPE));
     })
 );
 
 router.get('/cryptos/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
-        res.json(await getInvestmentsList(userId, 'crypto'));
+        res.json(await getInvestmentsList(userId, CRYPTO_TYPE));
     })
 );
 
 router.get('/bonds/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
-        res.json(await getInvestmentsList(userId, 'bond'));
+        res.json(await getInvestmentsList(userId, BOND_TYPE));
     })
 );
 
 router.get('/stocks/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
-        res.json(await getInvestmentsList(userId, 'stock'));
+        res.json(await getInvestmentsList(userId, STOCK_TYPE));
     })
 )
 
@@ -339,7 +269,7 @@ router.post('/deposits/', verifyToken, depositValidators,
         const { name, spot, description, value, currency, interest, startDate } = req.body;
 
         const docRef = await INVESTMENT_COLLECTION.add({
-            userId, investmentType: 'deposit', //
+            userId, investmentType: DEPOSIT_TYPE, //
             name, spot, description, value, currency, interest, startDate, //
             createdAt: new Date()
         });
@@ -359,7 +289,7 @@ router.post('/cryptos/', verifyToken, cryptoValidators,
         const { name, spot, description, quantity, priceAtStartDate, priceRelativeToCurrency, cryptoSymbol, stakingInterest, startDate } = req.body;
 
         const docRef = await INVESTMENT_COLLECTION.add({
-            userId, investmentType: 'crypto', //
+            userId, investmentType: CRYPTO_TYPE, //
             name, spot, description, quantity, priceAtStartDate, priceRelativeToCurrency, cryptoSymbol, stakingInterest, startDate, //
             createdAt: new Date()
         });
@@ -384,7 +314,7 @@ router.post('/bonds/', verifyToken, bondValidators,
         }
 
         const docRef = await INVESTMENT_COLLECTION.add({
-            userId, investmentType: 'bond', //
+            userId, investmentType: BOND_TYPE, //
             name, spot, description, volume, currency, price, bondTicker,
             interestsList: interestsListVar,
             startDate, dueDate, //
@@ -408,7 +338,7 @@ router.post('/stocks/', verifyToken, stockValidators,
         const { name, spot, description, volume, price, priceRelativeToCurrency, startDate, stockTicker, dividend } = req.body;
 
         const docRef = await INVESTMENT_COLLECTION.add({
-            userId, investmentType: 'stock', //
+            userId, investmentType: STOCK_TYPE, //
             name, spot, description, volume, price, priceRelativeToCurrency, startDate, stockTicker, dividend, //
             createdAt: new Date()
         });
@@ -432,7 +362,7 @@ router.put('/deposits/:id', verifyToken, depositValidators,
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
 
-        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== 'deposit') {
+        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== DEPOSIT_TYPE) {
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
@@ -456,7 +386,7 @@ router.put('/cryptos/:id', verifyToken, cryptoValidators,
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
 
-        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== 'crypto') {
+        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== CRYPTO_TYPE) {
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
@@ -480,7 +410,7 @@ router.put('/bonds/:id', verifyToken, bondValidators,
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
 
-        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== 'bond') {
+        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== BOND_TYPE) {
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
@@ -515,7 +445,7 @@ router.put('/stocks/:id', verifyToken, stockValidators,
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
 
-        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== 'stock') {
+        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== STOCK_TYPE) {
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
@@ -537,7 +467,7 @@ router.delete('/deposits/:id', verifyToken,
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
 
-        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== 'deposit') {
+        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== DEPOSIT_TYPE) {
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
@@ -555,7 +485,7 @@ router.delete('/cryptos/:id', verifyToken,
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
 
-        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== 'crypto') {
+        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== CRYPTO_TYPE) {
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
@@ -573,7 +503,7 @@ router.delete('/bonds/:id', verifyToken,
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
 
-        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== 'bond') {
+        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== BOND_TYPE) {
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 
@@ -591,7 +521,7 @@ router.delete('/stocks/:id', verifyToken,
         const docRef = INVESTMENT_COLLECTION.doc(id);
         const doc = await docRef.get();
 
-        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== 'stock') {
+        if (!doc.exists || doc.data().userId !== userId || doc.data().investmentType !== STOCK_TYPE) {
             return res.status(404).json({ error: "Item not found or not yours" });
         }
 

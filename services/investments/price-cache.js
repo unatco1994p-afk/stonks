@@ -89,14 +89,11 @@ async function updateDocsBatch(updates) {
       });
     }
     await batch.commit();
-    console.log(`✅ zapisano batch ${i + 1}/${chunks.length} (${chunk.length} dokumentów)`);
+    console.log(`✅ saved to price cache ${i + 1}/${chunks.length} (${chunk.length} docs)`);
   }
 }
 
-async function runTask() {
-    const now = Date.now();
-    console.log('Run price fetch task...');
-
+export async function fetchInvestmentsPrices() {
     // TODO: generate RESOURCES based on investments
 
     // grupujemy po typie
@@ -109,11 +106,10 @@ async function runTask() {
     // === CRYPTO (batch fetch) ===
     if (cryptos.length > 0) {
         const symbols = cryptos.map(c => c.name);
-        console.log(`🚀 Pobieram ceny CRYPTO dla: ${symbols.join(', ')}`);
         const prices = await fetchCryptoPrices(symbols, 'pln'); // { BTC: 123, ETH: 456, ... }
 
-        console.log(prices);
         for (const { name } of cryptos) {
+            console.log(`➡️ [crypto:${name}] price...`);
             const value = prices[name.toUpperCase()] || 0;
             updates.push({ type: 'crypto', name, value, currency: 'PLN' });
         }
@@ -121,10 +117,9 @@ async function runTask() {
 
     // === CURRENCIES (batch fetch) ===
     if (currencies.length > 0) {
-        const symbols = currencies.map(c => c.name);
-        console.log(`🚀 Pobieram kursy walut: ${symbols.join(', ')}`);
 
         for (const { name } of currencies) {
+            console.log(`➡️ [currency:${name}] price...`);
             const value = await fetchCurrencyPrice(name, 'PLN') || 0;
             updates.push({ type: 'currency', name, value, currency: 'PLN' });
         }
@@ -133,10 +128,10 @@ async function runTask() {
     // === GPW STOCKS (po kolei, ze sleepem) ===
     for (const { name } of gpwStocks) {
         try {
-            console.log(`🚀 [gpwStock:${name}] pobieram cenę...`);
+            console.log(`➡️ [gpwStock:${name}] price...`);
             const value = await fetchStockPriceGPW(name);
             updates.push({ type: 'gpwStock', name, value, currency: 'PLN' });
-            await sleep(100); // throttling API
+            await sleep(70); // throttling API
         } catch (err) {
             console.error(`❌ [gpwStock:${name}] błąd:`, err);
         }
@@ -176,9 +171,4 @@ export async function getCachedPrice(type, name) {
         currency: data.price?.currency ?? 'PLN',
         lastCalculated: data.lastCalculated ?? 0,
     };
-}
-
-export function scheduleTask() {
-    runTask();
-    setInterval(runTask, CACHE_TTL_MS);
 }

@@ -2,6 +2,7 @@ import express from 'express';
 import asyncHandler from '../config/async-error-handler.js';
 import { calculateCurrentValueForAllUsers } from '../repository/investments-repository.js';
 import { fetchInvestmentsPrices } from '../services/investments/price-cache.js';
+import { runInvestmentAggregateTask } from '../services/investments/aggregate.js';
 
 const router = express.Router();
 

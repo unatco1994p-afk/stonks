@@ -1,4 +1,6 @@
-import db, { INVESTMENT_COLLECTION, USERS_COLLECTIONS } from '../config/db.js';
+import db, { INVESTMENT_COLLECTION, USERS_COLLECTION } from '../config/db.js';
+import { getAllCachedPrices } from '../services/investments/price-cache.js';
+import { calculateCurrentDepositValue, calculateCurrentCryptoValue, calculateCurrentBondValue } from '../services/investments/value-calculator.js';
 
 export const DEPOSIT_TYPE = 'deposit';
 export const CRYPTO_TYPE = 'crypto';
@@ -21,13 +23,15 @@ export async function getInvestmentsList(userId, investmentType) {
 }
 
 export async function calculateCurrentValueForAllUsers() {
-    const users = USERS_COLLECTION.get();
-    users.forEach(userDoc => {
+    const snapshot = await USERS_COLLECTION.get();
+
+    for (const userDoc of snapshot.docs) {
         const user = userDoc.data();
 
         // TODO: check only 'investment' users
-        await calculateCurrentValue(user.id);
-    });
+
+        await calculateCurrentValue(userDoc.id);
+    }
 
 }
 
@@ -107,6 +111,3 @@ async function commitInBatches(investments) {
         await batch.commit();
     }
 }
-
-
-// TODO: add separation between db and router

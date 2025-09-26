@@ -3,6 +3,8 @@ import cors from 'cors';
 import routes from './routes/main.js';
 import { verifyToken } from './config/auth.js';
 import { fetchInvestmentsPrices } from './services/investments/price-cache.js';
+import { calculateCurrentValueForAllUsers } from './repository/investments-repository.js';
+import { runInvestmentAggregateTask } from './services/investments/aggregate.js';
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -25,8 +27,17 @@ app.listen(PORT, () => {
 });
 
 if (process.env.RUN_INIT_TASKS) {
-    setTimeout(() => {
+    setTimeout(async () => {
+        console.log('[🚀] Running Fetch Investments Prices Task...' )
         await fetchInvestmentsPrices();
+        console.log('[✅] Fetch Investments Prices Task done!' );
+
+        console.log('[🚀] Running Investments Current Value Recalculation Task...' )
         await calculateCurrentValueForAllUsers();
+        console.log('[✅] Investments Current Value Recalculation Task done!' );
+
+        console.log('[🚀] Running Investments Aggregate Task...' )
+        await runInvestmentAggregateTask();
+        console.log('[✅] Investments Aggregate Task done!' );
     }, 100);
 }

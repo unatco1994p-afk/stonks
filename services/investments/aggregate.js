@@ -1,6 +1,6 @@
 import { getAllCachedPrices } from './price-cache.js';
 import { getInvestmentsList, DEPOSIT_TYPE, CRYPTO_TYPE, BOND_TYPE, STOCK_TYPE } from '../../repository/investments-repository.js';
-import db, { INVESTMENT_AGGREGATE_COLLECTION, USERS_COLLECTION } from '../config/db.js';
+import db, { INVESTMENT_AGGREGATE_COLLECTION, USERS_COLLECTION } from '../../config/db.js';
 
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
@@ -34,7 +34,7 @@ export async function getTotalPortfolio(userId) {
     const calculateTotals = (items, currencyField = 'currency') => {
         let totalPln = 0;
         items.forEach(item => {
-            const valuePln = convertToPln(item.currentValue, item[currencyField]);
+            const valuePln = convertToPln(item.currentValue, currencyField === 'use:PLN' ? 'PLN' : item[currencyField]);
             totalPln += valuePln;
         });
         return {
@@ -45,7 +45,7 @@ export async function getTotalPortfolio(userId) {
     };
 
     const depositsTotals = calculateTotals(deposits);
-    const cryptoTotals = calculateTotals(cryptos);
+    const cryptoTotals = calculateTotals(cryptos, 'use:PLN');
     const bondsTotals = calculateTotals(bonds);
     const stocksTotals = calculateTotals(stocks, 'priceRelativeToCurrency');
 
@@ -63,23 +63,22 @@ export async function getTotalPortfolio(userId) {
 }
 
 
-async function runInvestmentAggregateTask() {
+export async function runInvestmentAggregateTask() {
     const now = Date.now();
-    console.log('Run investment aggregate task...');
 
-    const users = USERS_COLLECTION.get();
-    users.forEach(userDoc => {
+    const snapshot = await USERS_COLLECTION.get();
+    for (const userDoc of snapshot.docs) {
         const user = userDoc.data();
 
         // TODO: check only 'investment' users
-        const userPortfolio = await getTotalPortfolio(user.id);
+        const userPortfolio = await getTotalPortfolio(userDoc.id);
 
         if (userPortfolio) {
             await INVESTMENT_AGGREGATE_COLLECTION.add({
-                userId: user.id,
+                userId: userDoc.id,
                 calculatedAt: now,
                 portfolio: userPortfolio, 
             })
         }
-    });
+    }
 }

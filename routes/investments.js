@@ -4,9 +4,8 @@ import { verifyToken } from '../config/auth.js';
 import { body } from 'express-validator';
 import asyncHandler from '../config/async-error-handler.js';
 import validateRequest from '../config/validate-request.js';
-import { calculateCurrentBondValue, calculateCurrentDepositValue, calculateCurrentCryptoValue } from '../services/investments/value-calculator.js';
 import { getAllCachedPrices } from '../services/investments/price-cache.js';
-import { getTotalPortfolio } from '../services/investments/aggregate.js';
+import { getTotalPortfolio, getTotalPortfolioInitial, getTotalPortfolioVelocityPerHour } from '../services/investments/aggregate.js';
 import { getInvestmentsList, calculateCurrentValue, DEPOSIT_TYPE, CRYPTO_TYPE, BOND_TYPE, STOCK_TYPE } from '../repository/investments-repository.js';
 
 const validators = {
@@ -199,13 +198,27 @@ const stockValidators = [
 
 const router = express.Router();
 
+router.get('/total-portfolio-velocity', verifyToken,
+    asyncHandler(async (req, res) => {
+        const userId = req.user.uid;
+
+        const velocity = await getTotalPortfolioVelocityPerHour(userId);
+
+        res.json(velocity);
+    })
+);
+
 router.get('/total-portfolio/', verifyToken,
     asyncHandler(async (req, res) => {
         const userId = req.user.uid;
 
-        const total = getTotalPortfolio(userId);
+        const total = await getTotalPortfolio(userId);
+        const totalInitial = await getTotalPortfolioInitial(userId);
 
-        res.json(total);
+        res.json({
+            current: total,
+            initial: totalInitial,
+        });
     })
 );
 
